@@ -3,6 +3,11 @@ const User = require("../models/user");
 const BadRequestError = require("../errors/bad-request-error");
 const ConflictError = require("../errors/conflict-error");
 const NotFoundError = require("../errors/not-found-error");
+const {
+  createFollowRequestNotification,
+  createFollowAcceptedNotification,
+  deleteFollowNotifications,
+} = require("../utils/notifications");
 
 const userFields = "name about avatar isPrivate lastActiveAt";
 
@@ -52,6 +57,10 @@ const followUser = async (req, res) => {
     acceptedAt: isAccepted ? new Date() : null,
   });
 
+  if (!isAccepted) {
+    await createFollowRequestNotification(follow);
+  }
+
   await follow.populate("following", userFields);
 
   res.status(201).send({
@@ -69,6 +78,7 @@ const unfollowUser = async (req, res) => {
     throw new NotFoundError("Follow relationship or request not found");
   }
 
+  await deleteFollowNotifications(follow._id);
   res.status(204).send();
 };
 
@@ -196,6 +206,11 @@ const acceptFollowRequest = async (req, res) => {
     throw new NotFoundError("Pending follow request not found");
   }
 
+  await Promise.all([
+    deleteFollowNotifications(follow._id, "follow_request"),
+    createFollowAcceptedNotification(follow),
+  ]);
+
   res.send({
     follow,
   });
@@ -212,6 +227,7 @@ const rejectFollowRequest = async (req, res) => {
     throw new NotFoundError("Pending follow request not found");
   }
 
+  await deleteFollowNotifications(follow._id);
   res.status(204).send();
 };
 
@@ -226,6 +242,7 @@ const removeFollower = async (req, res) => {
     throw new NotFoundError("Follower not found");
   }
 
+  await deleteFollowNotifications(follow._id);
   res.status(204).send();
 };
 

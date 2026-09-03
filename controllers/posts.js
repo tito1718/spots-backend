@@ -4,6 +4,11 @@ const Comment = require("../models/comment");
 const Post = require("../models/post");
 const ForbiddenError = require("../errors/forbidden-error");
 const NotFoundError = require("../errors/not-found-error");
+const {
+  createPostLikeNotification,
+  deletePostLikeNotification,
+  deletePostNotifications,
+} = require("../utils/notifications");
 const { canViewPost, getVisiblePostQuery } = require("../utils/post-access");
 
 const populatePost = (query) =>
@@ -192,6 +197,7 @@ const deletePost = async (req, res) => {
     Comment.deleteMany({
       post: post._id,
     }),
+    deletePostNotifications(post._id),
     Collection.updateMany(
       {
         coverPost: post._id,
@@ -243,6 +249,11 @@ const likePost = async (req, res) => {
     operation: "like",
   });
 
+  await createPostLikeNotification({
+    post,
+    actor: req.user._id,
+  });
+
   res.send({
     post: serializePost(post, req.user._id),
   });
@@ -253,6 +264,11 @@ const unlikePost = async (req, res) => {
     postId: req.params.postId,
     user: req.user,
     operation: "unlike",
+  });
+
+  await deletePostLikeNotification({
+    postId: post._id,
+    actor: req.user._id,
   });
 
   res.send({

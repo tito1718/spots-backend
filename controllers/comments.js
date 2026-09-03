@@ -3,6 +3,10 @@ const Post = require("../models/post");
 const ForbiddenError = require("../errors/forbidden-error");
 const NotFoundError = require("../errors/not-found-error");
 const { canViewPost } = require("../utils/post-access");
+const {
+  createPostCommentNotification,
+  deleteCommentNotification,
+} = require("../utils/notifications");
 
 const findAccessiblePost = async (postId, user) => {
   const post = await Post.findById(postId);
@@ -61,6 +65,12 @@ const createComment = async (req, res) => {
     body: req.body.body,
   });
 
+  await createPostCommentNotification({
+    post,
+    comment,
+    actor: req.user._id,
+  });
+
   await comment.populate("owner", "name about avatar");
 
   res.status(201).send({
@@ -107,7 +117,11 @@ const deleteComment = async (req, res) => {
     );
   }
 
-  await comment.deleteOne();
+  await Promise.all([
+    comment.deleteOne(),
+    deleteCommentNotification(comment._id),
+  ]);
+
   res.status(204).send();
 };
 

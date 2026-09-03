@@ -4,6 +4,7 @@ const Comment = require("../models/comment");
 const Post = require("../models/post");
 const ForbiddenError = require("../errors/forbidden-error");
 const NotFoundError = require("../errors/not-found-error");
+const { canViewPost, getVisiblePostQuery } = require("../utils/post-access");
 
 const populatePost = (query) =>
   query.populate("owner", "name about avatar").populate("commentCount");
@@ -83,12 +84,8 @@ const addFilters = (query, requestQuery) => {
 
 const getPosts = async (req, res) => {
   const pagination = getPagination(req.query);
-  const query = addFilters(
-    {
-      visibility: "public",
-    },
-    req.query,
-  );
+  const visibilityQuery = await getVisiblePostQuery(req.user);
+  const query = addFilters(visibilityQuery, req.query);
 
   const result = await findPaginatedPosts({
     query,
@@ -124,15 +121,7 @@ const getMyPosts = async (req, res) => {
 const getPost = async (req, res) => {
   const post = await populatePost(Post.findById(req.params.postId));
 
-  const ownerId = post?.owner?._id?.toString();
-  const currentUserId = req.user?._id?.toString();
-  const canView =
-    post &&
-    (post.visibility === "public" ||
-      ownerId === currentUserId ||
-      req.user?.role === "admin");
-
-  if (!canView) {
+  if (!post || !(await canViewPost(post, req.user))) {
     throw new NotFoundError("Post not found");
   }
 
@@ -170,7 +159,6 @@ const updatePost = async (req, res) => {
   assertCanManagePost(post, req.user);
 
   const { location, ...updates } = req.body;
-
   Object.assign(post, updates);
 
   if (location === null) {
@@ -220,28 +208,40 @@ const deletePost = async (req, res) => {
   res.status(204).send();
 };
 
-const likePost = async (req, res) => {
-  const post = await populatePost(
-    Post.findOneAndUpdate(
-      {
-        _id: req.params.postId,
-        visibility: "public",
-      },
-      {
-        $addToSet: {
-          likedBy: req.user._id,
-        },
-      },
-      {
-        new: true,
-        runValidators: true,
-      },
-    ),
-  );
+const updatePostLike = async ({ postId, user, operation }) => {
+  const existingPost = await Post.findById(postId);
 
-  if (!post) {
+  if (!existingPost || !(await canViewPost(existingPost, user))) {
     throw new NotFoundError("Post not found");
   }
+
+  const update =
+    operation === "like"
+      ? {
+          $addToSet: {
+            likedBy: user._id,
+          },
+        }
+      : {
+          $pull: {
+            likedBy: user._id,
+          },
+        };
+
+  return populatePost(
+    Post.findByIdAndUpdate(postId, update, {
+      new: true,
+      runValidators: true,
+    }),
+  );
+};
+
+const likePost = async (req, res) => {
+  const post = await updatePostLike({
+    postId: req.params.postId,
+    user: req.user,
+    operation: "like",
+  });
 
   res.send({
     post: serializePost(post, req.user._id),
@@ -249,27 +249,11 @@ const likePost = async (req, res) => {
 };
 
 const unlikePost = async (req, res) => {
-  const post = await populatePost(
-    Post.findOneAndUpdate(
-      {
-        _id: req.params.postId,
-        visibility: "public",
-      },
-      {
-        $pull: {
-          likedBy: req.user._id,
-        },
-      },
-      {
-        new: true,
-        runValidators: true,
-      },
-    ),
-  );
-
-  if (!post) {
-    throw new NotFoundError("Post not found");
-  }
+  const post = await updatePostLike({
+    postId: req.params.postId,
+    user: req.user,
+    operation: "unlike",
+  });
 
   res.send({
     post: serializePost(post, req.user._id),

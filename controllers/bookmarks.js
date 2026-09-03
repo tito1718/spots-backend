@@ -1,5 +1,10 @@
 const mongoose = require("mongoose");
 
+const {
+  canViewPost,
+  getAcceptedFollowingIds,
+} = require("../utils/post-access");
+
 const Bookmark = require("../models/bookmark");
 const Collection = require("../models/collection");
 const Post = require("../models/post");
@@ -37,16 +42,6 @@ const findOwnedCollection = async (collectionId, userId) => {
   return collection;
 };
 
-const canAccessPost = (post, user) => {
-  const postOwnerId = post.owner?._id || post.owner;
-
-  return (
-    post.visibility === "public" ||
-    postOwnerId?.toString() === user._id.toString() ||
-    user.role === "admin"
-  );
-};
-
 const getAccessibleBookmarkPage = async ({
   ownerId,
   role,
@@ -68,6 +63,8 @@ const getAccessibleBookmarkPage = async ({
     bookmarkMatch.tags = tag.toLowerCase();
   }
 
+  const acceptedFollowingIds = await getAcceptedFollowingIds(ownerId);
+
   const postAccessExpression =
     role === "admin"
       ? { $eq: ["$_id", "$$postId"] }
@@ -78,6 +75,12 @@ const getAccessibleBookmarkPage = async ({
               $or: [
                 { $eq: ["$visibility", "public"] },
                 { $eq: ["$owner", ownerObjectId] },
+                {
+                  $and: [
+                    { $eq: ["$visibility", "followers"] },
+                    { $in: ["$owner", acceptedFollowingIds] },
+                  ],
+                },
               ],
             },
           ],
@@ -206,7 +209,7 @@ const getBookmark = async (req, res) => {
     throw new NotFoundError("Bookmark not found");
   }
 
-  if (!canAccessPost(bookmark.post, req.user)) {
+  if (!(await canViewPost(bookmark.post, req.user))) {
     throw new NotFoundError("Bookmark not found");
   }
 
@@ -218,7 +221,7 @@ const getBookmark = async (req, res) => {
 const createBookmark = async (req, res) => {
   const post = await Post.findById(req.body.postId);
 
-  if (!post || !canAccessPost(post, req.user)) {
+  if (!post || !(await canViewPost(post, req.user))) {
     throw new NotFoundError("Post not found");
   }
 

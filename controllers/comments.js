@@ -2,23 +2,12 @@ const Comment = require("../models/comment");
 const Post = require("../models/post");
 const ForbiddenError = require("../errors/forbidden-error");
 const NotFoundError = require("../errors/not-found-error");
-
-const getPostOwnerId = (post) => post.owner?._id || post.owner;
-
-const canViewPost = (post, user) => {
-  const ownerId = getPostOwnerId(post);
-
-  return (
-    post.visibility === "public" ||
-    ownerId?.toString() === user?._id?.toString() ||
-    user?.role === "admin"
-  );
-};
+const { canViewPost } = require("../utils/post-access");
 
 const findAccessiblePost = async (postId, user) => {
   const post = await Post.findById(postId);
 
-  if (!post || !canViewPost(post, user)) {
+  if (!post || !(await canViewPost(post, user))) {
     throw new NotFoundError("Post not found");
   }
 

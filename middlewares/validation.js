@@ -101,6 +101,20 @@ const validatePostCreation = celebrate({
   }).required(),
 });
 
+const validatePostUpdate = celebrate({
+  [Segments.BODY]: Joi.object({
+    caption: Joi.string().trim().min(2).max(2200),
+    location: Joi.alternatives().try(location, Joi.valid(null)),
+    tags: Joi.array()
+      .items(Joi.string().trim().min(1).max(40))
+      .max(10)
+      .unique(),
+    visibility: Joi.string().valid("public", "followers", "private"),
+  })
+    .min(1)
+    .required(),
+});
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -108,4 +122,5 @@ module.exports = {
   validatePostQuery,
   validatePostId,
   validatePostCreation,
+  validatePostUpdate,
 };

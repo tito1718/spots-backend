@@ -1,3 +1,4 @@
+const path = require("node:path");
 const express = require("express");
 const expressWinston = require("express-winston");
 const mongoose = require("mongoose");
@@ -87,6 +88,12 @@ app.get("/ready", (req, res) => {
       database: databaseConnected ? "connected" : "disconnected",
     },
     requestId: req.id,
+  });
+});
+
+app.get("/openapi.json", (_req, res) => {
+  res.sendFile("openapi.json", {
+    root: path.join(__dirname, "docs"),
   });
 });
 

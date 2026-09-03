@@ -58,3 +58,14 @@ test("readiness reports a disconnected test database", async () => {
   assert.equal(response.body.checks.database, "disconnected");
   assert.equal(response.body.requestId, response.headers["x-request-id"]);
 });
+
+test("GET /openapi.json serves the API specification", async () => {
+  const response = await request(app).get("/openapi.json");
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.openapi, "3.1.0");
+  assert.equal(response.body.info.title, "Spots Backend API");
+  assert.ok(response.body.paths["/auth/login"]);
+  assert.ok(response.body.paths["/posts/nearby"]);
+  assert.ok(response.body.paths["/notifications"]);
+});

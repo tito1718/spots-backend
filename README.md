@@ -106,6 +106,16 @@ Confirms that the application is running and MongoDB is connected.
 
 Every response includes an `X-Request-Id` header. Error responses also include the same identifier in their JSON body for troubleshooting.
 
+## API Specification
+
+The complete OpenAPI 3.1 specification is stored in `docs/openapi.json`.
+
+While the server is running, retrieve it from:
+
+    GET /openapi.json
+
+The file can be imported into tools such as Swagger Editor, Postman, Insomnia, and API-client generators.
+
 ## Authentication
 
 Protected endpoints require an access token:

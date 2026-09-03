@@ -4,7 +4,7 @@
   "description": "REST API for the Spots social photo-sharing application",
   "main": "server.js",
   "scripts": {
-    "test": "node --test",
+    "test": "NODE_ENV=test node --test",
     "start": "node server.js",
     "dev": "node --watch server.js",
     "lint": "eslint .",

@@ -2,6 +2,7 @@ const router = require("express").Router();
 
 const {
   getPosts,
+  getNearbyPosts,
   getMyPosts,
   getPost,
   createPost,
@@ -13,6 +14,7 @@ const {
 const { getComments, createComment } = require("../controllers/comments");
 const auth = require("../middlewares/auth");
 const optionalAuth = require("../middlewares/optional-auth");
+const { validateNearbyPostQuery } = require("../middlewares/nearby-validation");
 const {
   validatePostId,
   validatePostQuery,
@@ -26,6 +28,9 @@ const {
 } = require("../middlewares/comment-validation");
 
 router.get("/", optionalAuth, validatePostQuery, getPosts);
+
+router.get("/nearby", optionalAuth, validateNearbyPostQuery, getNearbyPosts);
+
 router.get("/mine", auth, validatePostQuery, getMyPosts);
 router.post("/", auth, validatePostCreation, createPost);
 

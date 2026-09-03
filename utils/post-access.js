@@ -1,3 +1,5 @@
+const mongoose = require("mongoose");
+
 const Follow = require("../models/follow");
 
 const getPostOwnerId = (post) => post?.owner?._id || post?.owner;
@@ -71,9 +73,41 @@ const getVisiblePostQuery = async (user) => {
   };
 };
 
+const getVisiblePostAggregationQuery = async (user) => {
+  if (!user) {
+    return {
+      visibility: "public",
+    };
+  }
+
+  if (user.role === "admin") {
+    return {};
+  }
+
+  const followingIds = await getAcceptedFollowingIds(user._id);
+
+  return {
+    $or: [
+      {
+        visibility: "public",
+      },
+      {
+        owner: new mongoose.Types.ObjectId(user._id),
+      },
+      {
+        visibility: "followers",
+        owner: {
+          $in: followingIds,
+        },
+      },
+    ],
+  };
+};
+
 module.exports = {
   getPostOwnerId,
   getAcceptedFollowingIds,
   canViewPost,
   getVisiblePostQuery,
+  getVisiblePostAggregationQuery,
 };

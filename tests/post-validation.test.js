@@ -52,3 +52,49 @@ test("rejects invalid post data after authentication", async () => {
 
   assert.equal(response.status, 400);
 });
+
+test("requires coordinates for nearby post discovery", async () => {
+  const response = await request(app).get("/posts/nearby");
+
+  assert.equal(response.status, 400);
+});
+
+test("rejects invalid nearby longitude", async () => {
+  const response = await request(app).get(
+    "/posts/nearby?longitude=181&latitude=40",
+  );
+
+  assert.equal(response.status, 400);
+});
+
+test("rejects invalid nearby latitude", async () => {
+  const response = await request(app).get(
+    "/posts/nearby?longitude=-74&latitude=91",
+  );
+
+  assert.equal(response.status, 400);
+});
+
+test("rejects excessive nearby search radiuses", async () => {
+  const response = await request(app).get(
+    "/posts/nearby?longitude=-74&latitude=40&radiusKm=201",
+  );
+
+  assert.equal(response.status, 400);
+});
+
+test("rejects invalid nearby pagination", async () => {
+  const response = await request(app).get(
+    "/posts/nearby?longitude=-74&latitude=40&page=0",
+  );
+
+  assert.equal(response.status, 400);
+});
+
+test("rejects malformed tokens on nearby discovery", async () => {
+  const response = await request(app)
+    .get("/posts/nearby?longitude=-74&latitude=40")
+    .set("Authorization", "Bearer invalid-token");
+
+  assert.equal(response.status, 401);
+});

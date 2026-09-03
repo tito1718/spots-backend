@@ -10,7 +10,11 @@ const {
   deletePostLikeNotification,
   deletePostNotifications,
 } = require("../utils/notifications");
-const { canViewPost, getVisiblePostQuery } = require("../utils/post-access");
+const {
+  canViewPost,
+  getVisiblePostQuery,
+  getVisiblePostAggregationQuery,
+} = require("../utils/post-access");
 
 const populatePost = (query) =>
   query.populate("owner", "name about avatar").populate("commentCount");
@@ -101,6 +105,116 @@ const getPosts = async (req, res) => {
   res.send({
     posts: result.posts.map((post) => serializePost(post, req.user?._id)),
     pagination: result.pagination,
+  });
+};
+
+const getNearbyPosts = async (req, res) => {
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 12;
+  const radiusKm = Number(req.query.radiusKm) || 25;
+  const visibilityQuery = await getVisiblePostAggregationQuery(req.user);
+
+  const geoQuery = {
+    ...visibilityQuery,
+  };
+
+  if (req.query.tag) {
+    geoQuery.tags = req.query.tag.toLowerCase();
+  }
+
+  const [result] = await Post.aggregate([
+    {
+      $geoNear: {
+        near: {
+          type: "Point",
+          coordinates: [
+            Number(req.query.longitude),
+            Number(req.query.latitude),
+          ],
+        },
+        key: "location.point",
+        distanceField: "distanceMeters",
+        maxDistance: radiusKm * 1000,
+        spherical: true,
+        query: geoQuery,
+      },
+    },
+    {
+      $facet: {
+        matches: [
+          {
+            $skip: (page - 1) * limit,
+          },
+          {
+            $limit: limit,
+          },
+          {
+            $project: {
+              _id: 1,
+              distanceMeters: 1,
+            },
+          },
+        ],
+        metadata: [
+          {
+            $count: "total",
+          },
+        ],
+      },
+    },
+  ]);
+
+  const matches = result?.matches || [];
+  const ids = matches.map(({ _id }) => _id);
+  const total = result?.metadata?.[0]?.total || 0;
+
+  const posts = await populatePost(
+    Post.find({
+      _id: {
+        $in: ids,
+      },
+    }),
+  );
+
+  const postsById = new Map(posts.map((post) => [post._id.toString(), post]));
+
+  const distancesById = new Map(
+    matches.map(({ _id, distanceMeters }) => [
+      _id.toString(),
+      Math.round(distanceMeters),
+    ]),
+  );
+
+  res.send({
+    posts: ids
+      .map((id) => {
+        const post = postsById.get(id.toString());
+
+        if (!post) {
+          return null;
+        }
+
+        return {
+          ...serializePost(post, req.user?._id),
+          distanceMeters: distancesById.get(id.toString()),
+        };
+      })
+      .filter(Boolean),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page * limit < total,
+      hasPreviousPage: page > 1,
+    },
+    searchArea: {
+      center: {
+        type: "Point",
+        coordinates: [Number(req.query.longitude), Number(req.query.latitude)],
+      },
+      radiusKm,
+    },
   });
 };
 
@@ -313,6 +427,7 @@ const unlikePost = async (req, res) => {
 
 module.exports = {
   getPosts,
+  getNearbyPosts,
   getMyPosts,
   getUserPosts,
   getPost,

@@ -31,6 +31,7 @@ const createRefreshToken = (userId, sessionId) =>
     {
       subject: userId.toString(),
       expiresIn: REFRESH_TOKEN_LIFETIME,
+      jwtid: crypto.randomUUID(),
     },
   );
 
@@ -61,6 +62,12 @@ const getRefreshCookieOptions = () => ({
   maxAge: REFRESH_TOKEN_MAX_AGE,
 });
 
+const getRefreshCookieClearOptions = () => {
+  const { maxAge, ...options } = getRefreshCookieOptions();
+  void maxAge;
+  return options;
+};
+
 module.exports = {
   REFRESH_COOKIE_NAME,
   REFRESH_TOKEN_MAX_AGE,
@@ -70,4 +77,5 @@ module.exports = {
   verifyRefreshToken,
   hashToken,
   getRefreshCookieOptions,
+  getRefreshCookieClearOptions,
 };

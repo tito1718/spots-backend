@@ -3,8 +3,10 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const { rateLimit } = require("express-rate-limit");
+const { errors } = require("celebrate");
 
 const config = require("./utils/config");
+const routes = require("./routes");
 const NotFoundError = require("./errors/not-found-error");
 const errorHandler = require("./middlewares/error-handler");
 
@@ -49,10 +51,13 @@ app.get("/health", (_req, res) => {
   });
 });
 
+app.use(routes);
+
 app.use((_req, _res, next) => {
   next(new NotFoundError());
 });
 
+app.use(errors());
 app.use(errorHandler);
 
 module.exports = app;

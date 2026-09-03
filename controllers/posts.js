@@ -230,7 +230,7 @@ const updatePostLike = async ({ postId, user, operation }) => {
 
   return populatePost(
     Post.findByIdAndUpdate(postId, update, {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     }),
   );

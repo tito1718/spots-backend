@@ -185,7 +185,7 @@ const acceptFollowRequest = async (req, res) => {
       },
     },
     {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     },
   )

@@ -45,3 +45,13 @@ jobs:
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+  container:
+    name: Build production container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Build Docker image
+        run: docker build --tag spots-backend:ci .

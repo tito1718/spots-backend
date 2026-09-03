@@ -78,6 +78,22 @@ For automatic server restarts during development:
 
     npm run dev
 
+## Docker
+
+Build the production container:
+
+    docker build -t spots-backend .
+
+Run it with environment variables from the local environment file:
+
+    docker run --rm \
+      --name spots-backend \
+      --env-file .env \
+      -p 3002:3002 \
+      spots-backend
+
+The container runs as an unprivileged Node user and includes an HTTP health check for `GET /health`.
+
 ## Available Commands
 
 | Command                | Purpose                                   |

@@ -6,7 +6,14 @@ const errorHandler = (err, _req, res, _next) => {
 
   if (err.code === 11000) {
     statusCode = 409;
-    message = "An account with that email already exists";
+
+    if (err.keyPattern?.email) {
+      message = "An account with that email already exists";
+    } else if (err.keyPattern?.nameKey) {
+      message = "A collection with that name already exists";
+    } else {
+      message = "That resource already exists";
+    }
   } else if (err.name === "ValidationError" || err.name === "CastError") {
     statusCode = 400;
     message = "Invalid request data";

@@ -46,3 +46,33 @@ test("rejects malformed authenticated public-profile IDs", async () => {
 
   assert.equal(response.status, 400);
 });
+
+test("rejects malformed profile-post user IDs", async () => {
+  const response = await request(app).get("/users/not-an-object-id/posts");
+
+  assert.equal(response.status, 400);
+});
+
+test("rejects invalid profile-post pagination", async () => {
+  const response = await request(app).get(
+    `/users/${new mongoose.Types.ObjectId()}/posts?page=0`,
+  );
+
+  assert.equal(response.status, 400);
+});
+
+test("rejects invalid profile-post sorting", async () => {
+  const response = await request(app).get(
+    `/users/${new mongoose.Types.ObjectId()}/posts?sort=popular`,
+  );
+
+  assert.equal(response.status, 400);
+});
+
+test("rejects malformed access tokens on profile-post galleries", async () => {
+  const response = await request(app)
+    .get(`/users/${new mongoose.Types.ObjectId()}/posts`)
+    .set("Authorization", "Bearer invalid-token");
+
+  assert.equal(response.status, 401);
+});

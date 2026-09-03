@@ -2,6 +2,7 @@ const Bookmark = require("../models/bookmark");
 const Collection = require("../models/collection");
 const Comment = require("../models/comment");
 const Post = require("../models/post");
+const User = require("../models/user");
 const ForbiddenError = require("../errors/forbidden-error");
 const NotFoundError = require("../errors/not-found-error");
 const {
@@ -119,6 +120,40 @@ const getMyPosts = async (req, res) => {
 
   res.send({
     posts: result.posts.map((post) => serializePost(post, req.user._id)),
+    pagination: result.pagination,
+  });
+};
+
+const getUserPosts = async (req, res) => {
+  const userExists = await User.exists({
+    _id: req.params.userId,
+  });
+
+  if (!userExists) {
+    throw new NotFoundError("User not found");
+  }
+
+  const pagination = getPagination(req.query);
+  const visibilityQuery = await getVisiblePostQuery(req.user);
+  const query = addFilters(
+    {
+      $and: [
+        {
+          owner: req.params.userId,
+        },
+        visibilityQuery,
+      ],
+    },
+    req.query,
+  );
+
+  const result = await findPaginatedPosts({
+    query,
+    ...pagination,
+  });
+
+  res.send({
+    posts: result.posts.map((post) => serializePost(post, req.user?._id)),
     pagination: result.pagination,
   });
 };
@@ -279,6 +314,7 @@ const unlikePost = async (req, res) => {
 module.exports = {
   getPosts,
   getMyPosts,
+  getUserPosts,
   getPost,
   createPost,
   updatePost,

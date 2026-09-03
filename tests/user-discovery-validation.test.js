@@ -76,3 +76,47 @@ test("rejects malformed access tokens on profile-post galleries", async () => {
 
   assert.equal(response.status, 401);
 });
+
+test("protects password changes", async () => {
+  const response = await request(app).patch("/users/me/password").send({
+    currentPassword: "CurrentPassword123",
+    newPassword: "DifferentPassword123",
+  });
+
+  assert.equal(response.status, 401);
+});
+
+test("rejects weak replacement passwords", async () => {
+  const response = await request(app)
+    .patch("/users/me/password")
+    .set("Authorization", `Bearer ${accessToken}`)
+    .send({
+      currentPassword: "CurrentPassword123",
+      newPassword: "weak",
+    });
+
+  assert.equal(response.status, 400);
+});
+
+test("protects logout from all devices", async () => {
+  const response = await request(app).delete("/users/me/sessions");
+
+  assert.equal(response.status, 401);
+});
+
+test("protects permanent account deletion", async () => {
+  const response = await request(app).delete("/users/me").send({
+    password: "CurrentPassword123",
+  });
+
+  assert.equal(response.status, 401);
+});
+
+test("requires a password for permanent account deletion", async () => {
+  const response = await request(app)
+    .delete("/users/me")
+    .set("Authorization", `Bearer ${accessToken}`)
+    .send({});
+
+  assert.equal(response.status, 400);
+});

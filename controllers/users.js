@@ -1,8 +1,15 @@
 const User = require("../models/user");
 const Follow = require("../models/follow");
 const Post = require("../models/post");
+const Session = require("../models/session");
 const NotFoundError = require("../errors/not-found-error");
+const UnauthorizedError = require("../errors/unauthorized-error");
 const { getVisiblePostQuery } = require("../utils/post-access");
+const { deleteUserAccountData } = require("../utils/account-cleanup");
+const {
+  REFRESH_COOKIE_NAME,
+  getRefreshCookieClearOptions,
+} = require("../utils/tokens");
 
 const publicUserFields =
   "name about avatar isPrivate lastActiveAt createdAt updatedAt";
@@ -95,6 +102,55 @@ const updateCurrentUser = async (req, res) => {
   res.send({ user });
 };
 
+const changeCurrentUserPassword = async (req, res) => {
+  const user = await User.findById(req.user._id).select("+password");
+
+  if (!user || !(await user.comparePassword(req.body.currentPassword))) {
+    throw new UnauthorizedError("Current password is incorrect");
+  }
+
+  if (await user.comparePassword(req.body.newPassword)) {
+    throw new UnauthorizedError(
+      "New password must be different from the current password",
+    );
+  }
+
+  user.password = req.body.newPassword;
+  await user.save();
+
+  await Session.deleteMany({
+    user: user._id,
+  });
+
+  res.clearCookie(REFRESH_COOKIE_NAME, getRefreshCookieClearOptions());
+
+  res.status(204).send();
+};
+
+const logoutCurrentUserEverywhere = async (req, res) => {
+  await Session.deleteMany({
+    user: req.user._id,
+  });
+
+  res.clearCookie(REFRESH_COOKIE_NAME, getRefreshCookieClearOptions());
+
+  res.status(204).send();
+};
+
+const deleteCurrentUser = async (req, res) => {
+  const user = await User.findById(req.user._id).select("+password");
+
+  if (!user || !(await user.comparePassword(req.body.password))) {
+    throw new UnauthorizedError("Password is incorrect");
+  }
+
+  await deleteUserAccountData(user._id);
+
+  res.clearCookie(REFRESH_COOKIE_NAME, getRefreshCookieClearOptions());
+
+  res.status(204).send();
+};
+
 const searchUsers = async (req, res) => {
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 20;
@@ -180,6 +236,9 @@ const getUserProfile = async (req, res) => {
 module.exports = {
   getCurrentUser,
   updateCurrentUser,
+  changeCurrentUserPassword,
+  logoutCurrentUserEverywhere,
+  deleteCurrentUser,
   searchUsers,
   getUserProfile,
 };

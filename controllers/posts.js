@@ -1,6 +1,23 @@
+const Bookmark = require("../models/bookmark");
+const Collection = require("../models/collection");
+const Comment = require("../models/comment");
 const Post = require("../models/post");
 const ForbiddenError = require("../errors/forbidden-error");
 const NotFoundError = require("../errors/not-found-error");
+
+const populatePost = (query) =>
+  query.populate("owner", "name about avatar").populate("commentCount");
+
+const populatePostDocument = (post) =>
+  post.populate([
+    {
+      path: "owner",
+      select: "name about avatar",
+    },
+    {
+      path: "commentCount",
+    },
+  ]);
 
 const serializePost = (post, currentUserId) => {
   const serialized = post.toJSON();
@@ -11,6 +28,7 @@ const serializePost = (post, currentUserId) => {
       )
     : false;
 
+  serialized.commentCount ??= 0;
   delete serialized.likedBy;
 
   return serialized;
@@ -24,11 +42,15 @@ const getPagination = (query) => ({
 
 const findPaginatedPosts = async ({ query, page, limit, sortDirection }) => {
   const [posts, total] = await Promise.all([
-    Post.find(query)
-      .populate("owner", "name about avatar")
-      .sort({ createdAt: sortDirection, _id: sortDirection })
-      .skip((page - 1) * limit)
-      .limit(limit),
+    populatePost(
+      Post.find(query)
+        .sort({
+          createdAt: sortDirection,
+          _id: sortDirection,
+        })
+        .skip((page - 1) * limit)
+        .limit(limit),
+    ),
     Post.countDocuments(query),
   ]);
 
@@ -61,7 +83,12 @@ const addFilters = (query, requestQuery) => {
 
 const getPosts = async (req, res) => {
   const pagination = getPagination(req.query);
-  const query = addFilters({ visibility: "public" }, req.query);
+  const query = addFilters(
+    {
+      visibility: "public",
+    },
+    req.query,
+  );
 
   const result = await findPaginatedPosts({
     query,
@@ -76,7 +103,12 @@ const getPosts = async (req, res) => {
 
 const getMyPosts = async (req, res) => {
   const pagination = getPagination(req.query);
-  const query = addFilters({ owner: req.user._id }, req.query);
+  const query = addFilters(
+    {
+      owner: req.user._id,
+    },
+    req.query,
+  );
 
   const result = await findPaginatedPosts({
     query,
@@ -90,10 +122,7 @@ const getMyPosts = async (req, res) => {
 };
 
 const getPost = async (req, res) => {
-  const post = await Post.findById(req.params.postId).populate(
-    "owner",
-    "name about avatar",
-  );
+  const post = await populatePost(Post.findById(req.params.postId));
 
   const ownerId = post?.owner?._id?.toString();
   const currentUserId = req.user?._id?.toString();
@@ -118,7 +147,7 @@ const createPost = async (req, res) => {
     owner: req.user._id,
   });
 
-  await post.populate("owner", "name about avatar");
+  await populatePostDocument(post);
 
   res.status(201).send({
     post: serializePost(post, req.user._id),
@@ -152,7 +181,7 @@ const updatePost = async (req, res) => {
 
   post.editedAt = new Date();
   await post.save();
-  await post.populate("owner", "name about avatar");
+  await populatePostDocument(post);
 
   res.send({
     post: serializePost(post, req.user._id),
@@ -167,27 +196,48 @@ const deletePost = async (req, res) => {
   }
 
   assertCanManagePost(post, req.user);
-  await post.deleteOne();
 
+  await Promise.all([
+    Bookmark.deleteMany({
+      post: post._id,
+    }),
+    Comment.deleteMany({
+      post: post._id,
+    }),
+    Collection.updateMany(
+      {
+        coverPost: post._id,
+      },
+      {
+        $set: {
+          coverPost: null,
+        },
+      },
+    ),
+  ]);
+
+  await post.deleteOne();
   res.status(204).send();
 };
 
 const likePost = async (req, res) => {
-  const post = await Post.findOneAndUpdate(
-    {
-      _id: req.params.postId,
-      visibility: "public",
-    },
-    {
-      $addToSet: {
-        likedBy: req.user._id,
+  const post = await populatePost(
+    Post.findOneAndUpdate(
+      {
+        _id: req.params.postId,
+        visibility: "public",
       },
-    },
-    {
-      new: true,
-      runValidators: true,
-    },
-  ).populate("owner", "name about avatar");
+      {
+        $addToSet: {
+          likedBy: req.user._id,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      },
+    ),
+  );
 
   if (!post) {
     throw new NotFoundError("Post not found");
@@ -199,21 +249,23 @@ const likePost = async (req, res) => {
 };
 
 const unlikePost = async (req, res) => {
-  const post = await Post.findOneAndUpdate(
-    {
-      _id: req.params.postId,
-      visibility: "public",
-    },
-    {
-      $pull: {
-        likedBy: req.user._id,
+  const post = await populatePost(
+    Post.findOneAndUpdate(
+      {
+        _id: req.params.postId,
+        visibility: "public",
       },
-    },
-    {
-      new: true,
-      runValidators: true,
-    },
-  ).populate("owner", "name about avatar");
+      {
+        $pull: {
+          likedBy: req.user._id,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      },
+    ),
+  );
 
   if (!post) {
     throw new NotFoundError("Post not found");

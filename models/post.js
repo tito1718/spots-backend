@@ -177,6 +177,13 @@ postSchema.virtual("likesCount").get(function getLikesCount() {
   return this.likedBy.length;
 });
 
+postSchema.virtual("commentCount", {
+  ref: "Comment",
+  localField: "_id",
+  foreignField: "post",
+  count: true,
+});
+
 postSchema.index({ owner: 1, createdAt: -1 });
 postSchema.index({ visibility: 1, createdAt: -1 });
 postSchema.index({

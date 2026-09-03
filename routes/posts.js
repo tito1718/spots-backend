@@ -10,6 +10,7 @@ const {
   likePost,
   unlikePost,
 } = require("../controllers/posts");
+const { getComments, createComment } = require("../controllers/comments");
 const auth = require("../middlewares/auth");
 const optionalAuth = require("../middlewares/optional-auth");
 const {
@@ -18,10 +19,31 @@ const {
   validatePostCreation,
   validatePostUpdate,
 } = require("../middlewares/validation");
+const {
+  validateCommentPostId,
+  validateCommentQuery,
+  validateCommentCreation,
+} = require("../middlewares/comment-validation");
 
 router.get("/", optionalAuth, validatePostQuery, getPosts);
 router.get("/mine", auth, validatePostQuery, getMyPosts);
 router.post("/", auth, validatePostCreation, createPost);
+
+router.get(
+  "/:postId/comments",
+  optionalAuth,
+  validateCommentPostId,
+  validateCommentQuery,
+  getComments,
+);
+
+router.post(
+  "/:postId/comments",
+  auth,
+  validateCommentPostId,
+  validateCommentCreation,
+  createComment,
+);
 
 router.get("/:postId", optionalAuth, validatePostId, getPost);
 router.patch("/:postId", auth, validatePostId, validatePostUpdate, updatePost);

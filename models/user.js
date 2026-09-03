@@ -94,4 +94,9 @@ userSchema.methods.comparePassword = function comparePassword(candidate) {
   return bcrypt.compare(candidate, this.password);
 };
 
+userSchema.index({
+  name: 1,
+  _id: 1,
+});
+
 module.exports = mongoose.model("User", userSchema);
